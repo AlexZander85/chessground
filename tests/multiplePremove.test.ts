@@ -55,11 +55,7 @@ test('multiple premoves build a speculative position and execute in order', () =
 
   // Opponent move arrives. The parent replaces the speculative board with the
   // authoritative position and legal moves before asking Chessground to premove.
-  applyAuthoritativePosition(
-    state,
-    '7k/8/8/8/8/8/6K1/8 w - - 0 1',
-    new Map([['g2', ['f2']]]),
-  );
+  applyAuthoritativePosition(state, '7k/8/8/8/8/8/6K1/8 w - - 0 1', new Map([['g2', ['f2']]]));
 
   expect(playPremove(state)).toBe(true);
   expect(state.premovable.queue).toEqual([['f2', 'e2']]);
@@ -67,11 +63,7 @@ test('multiple premoves build a speculative position and execute in order', () =
   expect(state.pieces.has('e2')).toBe(true);
   expect(state.pieces.has('f2')).toBe(false);
 
-  applyAuthoritativePosition(
-    state,
-    '8/7k/8/8/8/8/5K2/8 w - - 0 1',
-    new Map([['f2', ['e2']]]),
-  );
+  applyAuthoritativePosition(state, '8/7k/8/8/8/8/5K2/8 w - - 0 1', new Map([['f2', ['e2']]]));
 
   expect(playPremove(state)).toBe(true);
   expect(state.premovable.queue).toEqual([]);
@@ -85,11 +77,7 @@ test('an illegal queue head cancels the dependent tail and restores the real pos
   expect(userMove(state, 'g2', 'f2')).toBe(true);
   expect(userMove(state, 'f2', 'e2')).toBe(true);
 
-  applyAuthoritativePosition(
-    state,
-    '7k/8/8/8/8/8/6K1/8 w - - 0 1',
-    new Map([['g2', ['h2']]]),
-  );
+  applyAuthoritativePosition(state, '7k/8/8/8/8/8/6K1/8 w - - 0 1', new Map([['g2', ['h2']]]));
 
   expect(playPremove(state)).toBe(false);
   expect(state.premovable.queue).toEqual([]);
