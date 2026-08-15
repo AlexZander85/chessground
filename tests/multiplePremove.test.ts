@@ -91,3 +91,37 @@ test('an illegal queue head cancels the dependent tail and restores the real pos
   expect(state.pieces.has('f2')).toBe(false);
   expect(state.pieces.has('e2')).toBe(false);
 });
+
+test('disabling premoves clears the queue and restores authoritative pieces', () => {
+  const state = makeState(4);
+
+  expect(userMove(state, 'g2', 'f2')).toBe(true);
+  expect(userMove(state, 'f2', 'e2')).toBe(true);
+  expect(state.pieces.has('e2')).toBe(true);
+
+  configure(state, { premovable: { enabled: false } });
+
+  expect(state.premovable.enabled).toBe(false);
+  expect(state.premovable.queue).toEqual([]);
+  expect(state.premovable.current).toBeUndefined();
+  expect(state.pieces.has('g2')).toBe(true);
+  expect(state.pieces.has('f2')).toBe(false);
+  expect(state.pieces.has('e2')).toBe(false);
+});
+
+test('switching multiple premoves to single keeps only the head without previewing it', () => {
+  const state = makeState(4);
+
+  expect(userMove(state, 'g2', 'f2')).toBe(true);
+  expect(userMove(state, 'f2', 'e2')).toBe(true);
+  expect(state.pieces.has('e2')).toBe(true);
+
+  configure(state, { premovable: { maxCount: 1 } });
+
+  expect(state.premovable.maxCount).toBe(1);
+  expect(state.premovable.queue).toEqual([['g2', 'f2']]);
+  expect(state.premovable.current).toEqual(['g2', 'f2']);
+  expect(state.pieces.has('g2')).toBe(true);
+  expect(state.pieces.has('f2')).toBe(false);
+  expect(state.pieces.has('e2')).toBe(false);
+});
