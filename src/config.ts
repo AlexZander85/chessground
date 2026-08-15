@@ -1,4 +1,4 @@
-import { setCheck, setSelected } from './board.js';
+import { setCheck, setSelected, unsetPremove } from './board.js';
 import { type DrawBrushes, type DrawShape } from './draw.js';
 import { read as fenRead } from './fen.js';
 import { type HeadlessState } from './state.js';
@@ -85,7 +85,7 @@ export interface Config {
   };
   drawable?: {
     enabled?: boolean; // can draw
-    visible?: boolean; // can view
+    visible?: boolean;
     defaultSnapToValidMove?: boolean;
     // Clicking an empty square or immovable piece will clear the drawing regardless, but when this property is true,
     // clicking on a (currently unselected) movable piece will also clear the drawing.
@@ -106,6 +106,26 @@ export function applyAnimation(state: HeadlessState, config: Config): void {
 }
 
 export function configure(state: HeadlessState, config: Config): void {
+  // A live preference change must never leave a speculative queue armed behind
+  // a disabled premove setting. Restore the authoritative pieces before applying
+  // the new configuration so a later playPremove() cannot execute stale input.
+  if (config.premovable?.enabled === false && state.premovable.queue.length) unsetPremove(state);
+  // Switching multiple -> single keeps the queue head, cancels the dependent
+  // tail and removes the speculative preview. This mirrors the compatibility
+  // behavior of a legacy single premove rather than silently discarding the head.
+  else if (
+    config.premovable?.maxCount !== undefined &&
+    config.premovable.maxCount <= 1 &&
+    state.premovable.maxCount > 1 &&
+    state.premovable.queue.length
+  ) {
+    const head = state.premovable.queue[0];
+    if (state.premovable.basePieces) state.pieces = new Map(state.premovable.basePieces);
+    state.premovable.queue = [head];
+    state.premovable.current = head;
+    state.premovable.basePieces = undefined;
+  }
+
   // don't merge destinations and autoShapes. Just override.
   if (config.movable?.dests) state.movable.dests = undefined;
   if (config.drawable?.autoShapes) state.drawable.autoShapes = [];
