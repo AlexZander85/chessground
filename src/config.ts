@@ -49,10 +49,11 @@ export interface Config {
     castle?: boolean; // whether to allow king castle premoves
     dests?: cg.Key[]; // premove destinations for the current selection
     customDests?: cg.Dests; // use custom valid premoves. {"a2" ["a3" "a4"] "b1" ["a3" "c3"]}
+    maxCount?: number; // maximum queued premoves; 1 keeps the legacy single-premove behaviour
     additionalPremoveRequirements?: cg.Mobility;
     events?: {
-      set?: (orig: cg.Key, dest: cg.Key, metadata?: cg.SetPremoveMetadata) => void; // called after the premove has been set
-      unset?: () => void; // called after the premove has been unset
+      set?: (orig: cg.Key, dest: cg.Key, metadata?: cg.SetPremoveMetadata) => void; // called after a premove has been set
+      unset?: () => void; // called after the premove queue has been cleared
     };
   };
   predroppable?: {
@@ -80,7 +81,7 @@ export interface Config {
     move?: (orig: cg.Key, dest: cg.Key, capturedPiece?: cg.Piece) => void;
     dropNewPiece?: (piece: cg.Piece, key: cg.Key) => void;
     select?: (key: cg.Key) => void; // called when a square is selected
-    insert?: (elements: cg.Elements) => void; // when the board DOM has been (re)inserted
+    insert?: (elements: cg.Elements) => void; // called when the board DOM has been (re)inserted
   };
   drawable?: {
     enabled?: boolean; // can draw
@@ -115,6 +116,11 @@ export function configure(state: HeadlessState, config: Config): void {
   if (config.fen) {
     state.pieces = fenRead(config.fen);
     state.drawable.shapes = config.drawable?.shapes || [];
+    // A server/parent position update becomes the new authoritative base for any
+    // queued premoves. playPremove() will validate the queue head against these
+    // real pieces before rebuilding the speculative preview for the remaining tail.
+    if (state.premovable.maxCount > 1 && state.premovable.queue.length)
+      state.premovable.basePieces = new Map(state.pieces);
   }
 
   // apply config values that could be undefined yet meaningful
