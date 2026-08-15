@@ -1,6 +1,5 @@
 import { playPremove, userMove } from '../src/board';
 import { configure } from '../src/config';
-import * as fen from '../src/fen';
 import { defaults, type HeadlessState } from '../src/state';
 import type * as cg from '../src/types';
 
@@ -20,11 +19,7 @@ const makeState = (maxCount: number): HeadlessState => {
   return state;
 };
 
-const applyAuthoritativePosition = (
-  state: HeadlessState,
-  piecesFen: string,
-  dests: cg.Dests,
-): void => {
+const applyAuthoritativePosition = (state: HeadlessState, piecesFen: string, dests: cg.Dests): void => {
   configure(state, {
     fen: piecesFen,
     turnColor: 'white',
