@@ -77,12 +77,17 @@ test('an illegal queue head cancels the dependent tail and restores the real pos
   expect(userMove(state, 'g2', 'f2')).toBe(true);
   expect(userMove(state, 'f2', 'e2')).toBe(true);
 
-  applyAuthoritativePosition(state, '7k/8/8/8/8/8/6K1/8 w - - 0 1', new Map([['g2', ['h2']]]));
+  // The opponent king moved from h8 to h7 in the authoritative update. If the
+  // premove head is rejected, rollback must keep h7 rather than restoring the
+  // stale pre-opponent position from which the speculative queue was created.
+  applyAuthoritativePosition(state, '8/7k/8/8/8/8/6K1/8 w - - 0 1', new Map([['g2', ['h2']]]));
 
   expect(playPremove(state)).toBe(false);
   expect(state.premovable.queue).toEqual([]);
   expect(state.premovable.current).toBeUndefined();
   expect(state.pieces.has('g2')).toBe(true);
+  expect(state.pieces.has('h7')).toBe(true);
+  expect(state.pieces.has('h8')).toBe(false);
   expect(state.pieces.has('f2')).toBe(false);
   expect(state.pieces.has('e2')).toBe(false);
 });
