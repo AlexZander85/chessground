@@ -51,17 +51,61 @@ export function setCheck(state: HeadlessState, color: cg.Color | boolean): void 
     }
 }
 
+const multiplePremovesEnabled = (state: HeadlessState): boolean => state.premovable.maxCount > 1;
+
+function previewMove(state: HeadlessState, orig: cg.Key, dest: cg.Key): boolean {
+  const piece = state.pieces.get(orig);
+  if (!piece || orig === dest) return false;
+  if (!tryAutoCastle(state, orig, dest)) {
+    state.pieces.set(dest, piece);
+    state.pieces.delete(orig);
+  }
+  return true;
+}
+
+function rebuildPremovePreview(state: HeadlessState): boolean {
+  for (const [orig, dest] of state.premovable.queue) if (!previewMove(state, orig, dest)) return false;
+  return true;
+}
+
+function clearPremove(state: HeadlessState, restorePreview: boolean): void {
+  const pm = state.premovable;
+  const hadPremove = !!pm.current || pm.queue.length > 0;
+  if (restorePreview && pm.basePieces) state.pieces = new Map(pm.basePieces);
+  pm.current = undefined;
+  pm.queue = [];
+  pm.basePieces = undefined;
+  if (hadPremove) callUserFunction(pm.events.unset);
+}
+
 function setPremove(state: HeadlessState, orig: cg.Key, dest: cg.Key, meta: cg.SetPremoveMetadata): void {
   unsetPredrop(state);
-  state.premovable.current = [orig, dest];
-  callUserFunction(state.premovable.events.set, orig, dest, meta);
+  const pm = state.premovable;
+  const move: cg.KeyPair = [orig, dest];
+
+  // Preserve the existing Chessground semantics by default: a new premove replaces
+  // the previous one and pieces stay on the authoritative board squares.
+  if (!multiplePremovesEnabled(state)) {
+    pm.queue = [move];
+    pm.current = move;
+    callUserFunction(pm.events.set, orig, dest, meta);
+    return;
+  }
+
+  if (pm.queue.length >= pm.maxCount) return;
+  if (!pm.queue.length) pm.basePieces = new Map(state.pieces);
+
+  // In multiple-premove mode the visible board is a speculative preview of our own
+  // queued replies. This lets the user immediately move the same piece again from
+  // its virtual destination while the opponent is still thinking.
+  if (!previewMove(state, orig, dest)) return;
+  pm.queue.push(move);
+  pm.current = pm.queue[0];
+  callUserFunction(pm.events.set, orig, dest, meta);
 }
 
 export function unsetPremove(state: HeadlessState): void {
-  if (state.premovable.current) {
-    state.premovable.current = undefined;
-    callUserFunction(state.premovable.events.unset);
-  }
+  clearPremove(state, true);
 }
 
 function setPredrop(state: HeadlessState, role: cg.Role, key: cg.Key): void {
@@ -293,7 +337,8 @@ export function isDraggable(state: HeadlessState, orig: cg.Key): boolean {
 }
 
 export function playPremove(state: HeadlessState): boolean {
-  const move = state.premovable.current;
+  const pm = state.premovable;
+  const move = pm.queue[0] ?? pm.current;
   if (!move) return false;
   const orig = move[0],
     dest = move[1];
@@ -307,8 +352,35 @@ export function playPremove(state: HeadlessState): boolean {
       success = true;
     }
   }
-  unsetPremove(state);
-  return success;
+
+  if (!multiplePremovesEnabled(state)) {
+    clearPremove(state, false);
+    return success;
+  }
+
+  if (!success) {
+    // The head no longer matches the real position after the opponent's move.
+    // The rest of the chain depends on it, so discard the complete queue.
+    clearPremove(state, true);
+    return false;
+  }
+
+  pm.queue.shift();
+  pm.current = pm.queue[0];
+  if (!pm.queue.length) {
+    clearPremove(state, false);
+    return true;
+  }
+
+  // Keep the just-played move as the new authoritative base, then re-apply only
+  // the remaining tail as a speculative board preview. A future server position
+  // update will replace this preview before the next head is validated.
+  pm.basePieces = new Map(state.pieces);
+  if (!rebuildPremovePreview(state)) {
+    clearPremove(state, true);
+    return true;
+  }
+  return true;
 }
 
 export function playPredrop(state: HeadlessState, validate: (drop: cg.Drop) => boolean): boolean {
