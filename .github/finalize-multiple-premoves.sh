@@ -1,0 +1,64 @@
+#!/usr/bin/env bash
+set -euo pipefail
+python3 - <<'PY'
+from pathlib import Path
+
+board = Path('src/board.ts')
+text = board.read_text()
+old = """  pm.queue.shift();
+  pm.current = pm.queue[0];
+  if (!pm.queue.length) {
+    clearPremove(state, false);
+    return true;
+  }
+"""
+new = """  pm.queue.shift();
+  pm.current = pm.queue[0];
+  if (!pm.queue.length) {
+    // Match the legacy single-premove contract: consuming the final
+    // premove emits unset after the move callback, while preserving
+    // the already-played authoritative board position.
+    pm.basePieces = undefined;
+    callUserFunction(pm.events.unset);
+    return true;
+  }
+"""
+if old in text:
+    text = text.replace(old, new, 1)
+elif new not in text:
+    raise SystemExit('expected final-queue block not found')
+board.write_text(text)
+
+tests = Path('tests/multiplePremove.test.ts')
+text = tests.read_text()
+marker = "test('consuming the last queued premove emits the legacy unset callback'"
+if marker not in text:
+    text += """
+
+test('consuming the last queued premove emits the legacy unset callback', () => {
+  vi.useFakeTimers();
+  const state = makeState(2);
+  const unset = vi.fn();
+  state.premovable.events.unset = unset;
+
+  expect(userMove(state, 'g2', 'f2')).toBe(true);
+  flushPreview();
+  applyAuthoritativePosition(state, '7k/8/8/8/8/8/6K1/8 w - - 0 1', new Map([['g2', ['f2']]]));
+
+  expect(playPremove(state)).toBe(true);
+  expect(state.premovable.queue).toEqual([]);
+  expect(unset).not.toHaveBeenCalled();
+  flushPreview();
+  expect(unset).toHaveBeenCalledTimes(1);
+});
+"""
+tests.write_text(text)
+PY
+
+git config user.name 'github-actions[bot]'
+git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+git add src/board.ts tests/multiplePremove.test.ts
+if ! git diff --cached --quiet; then
+  git commit -m 'Finalize queued premove compatibility'
+  git push
+fi
