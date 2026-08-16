@@ -52,6 +52,7 @@ test('consuming the last queued premove emits the legacy unset callback', () => 
   expect(unset).toHaveBeenCalledTimes(1);
 });
 """
+text = text.replace("});\n\n\ntest('consuming the last queued premove emits the legacy unset callback'", "});\n\ntest('consuming the last queued premove emits the legacy unset callback'")
 tests.write_text(text)
 PY
 
@@ -59,6 +60,6 @@ git config user.name 'github-actions[bot]'
 git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
 git add src/board.ts tests/multiplePremove.test.ts
 if ! git diff --cached --quiet; then
-  git commit -m 'Finalize queued premove compatibility'
+  git commit -m 'Normalize queued premove regression test'
   git push
 fi
