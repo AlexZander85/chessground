@@ -180,7 +180,6 @@ test('switching multiple premoves to single keeps only the head without previewi
   expect(state.pieces.has('e2')).toBe(false);
 });
 
-
 test('consuming the last queued premove emits the legacy unset callback', () => {
   vi.useFakeTimers();
   const state = makeState(2);
