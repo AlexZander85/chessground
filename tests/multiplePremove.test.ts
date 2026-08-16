@@ -179,3 +179,21 @@ test('switching multiple premoves to single keeps only the head without previewi
   expect(state.pieces.has('f2')).toBe(false);
   expect(state.pieces.has('e2')).toBe(false);
 });
+
+
+test('consuming the last queued premove emits the legacy unset callback', () => {
+  vi.useFakeTimers();
+  const state = makeState(2);
+  const unset = vi.fn();
+  state.premovable.events.unset = unset;
+
+  expect(userMove(state, 'g2', 'f2')).toBe(true);
+  flushPreview();
+  applyAuthoritativePosition(state, '7k/8/8/8/8/8/6K1/8 w - - 0 1', new Map([['g2', ['f2']]]));
+
+  expect(playPremove(state)).toBe(true);
+  expect(state.premovable.queue).toEqual([]);
+  expect(unset).not.toHaveBeenCalled();
+  flushPreview();
+  expect(unset).toHaveBeenCalledTimes(1);
+});

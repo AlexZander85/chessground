@@ -401,7 +401,11 @@ export function playPremove(state: HeadlessState): boolean {
   pm.queue.shift();
   pm.current = pm.queue[0];
   if (!pm.queue.length) {
-    clearPremove(state, false);
+    // Match the legacy single-premove contract: consuming the final
+    // premove emits unset after the move callback, while preserving
+    // the already-played authoritative board position.
+    pm.basePieces = undefined;
+    callUserFunction(pm.events.unset);
     return true;
   }
 
